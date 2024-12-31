@@ -6,14 +6,24 @@ import {
 } from "@aws-sdk/client-s3";
 import { TFile, Vault } from "obsidian";
 import { VaultSnapshot, FreeSyncSettings } from "./types";
+import { VaultUtility } from "./vault";
 
 export class FreeSyncStorage {
 	private client: S3Client;
 	private bucket: string;
+	private snapshot: VaultSnapshot;
 	vault: Vault;
+	vaultUtility: VaultUtility;
 
-	constructor(vault: Vault, settings: FreeSyncSettings) {
+	constructor(
+		vault: Vault,
+		settings: FreeSyncSettings,
+		vaultUtility: VaultUtility,
+		snapshot: VaultSnapshot
+	) {
 		this.vault = vault;
+		this.snapshot = snapshot;
+		this.vaultUtility = vaultUtility;
 		this.bucket = settings.bucket;
 		this.client = new S3Client({
 			region: "auto",
@@ -26,29 +36,31 @@ export class FreeSyncStorage {
 	}
 
 	async getSnapshot(): Promise<VaultSnapshot> {
-		try {
-			const snapshot = await this.client.send(
-				new GetObjectCommand({
-					Bucket: this.bucket,
-					Key: "current_snapshot",
-				})
-			);
-
-			if (!snapshot.Body) {
-				await this.writeSnapshot({ files: {} });
-				return { files: {} };
-			}
-
-			// Convert readable stream to text
-			const bodyContents = await snapshot.Body.transformToString();
-			return JSON.parse(bodyContents) as VaultSnapshot;
-		} catch (err) {
-			if (err.name === "NoSuchKey") {
-				await this.writeSnapshot({ files: {} });
-				return { files: {} };
-			}
-			throw new Error(err.message);
+		console.log("SS1");
+		const snapshot = await this.client.send(
+			new GetObjectCommand({
+				Bucket: this.bucket,
+				Key: "current_snapshot",
+			})
+		);
+		console.log("SS2", snapshot);
+		if (!snapshot.Body) {
+			await this.writeSnapshot({ files: {}, deletedFiles: {} });
+			return { files: {}, deletedFiles: {} };
 		}
+		console.log("SS3", snapshot);
+
+		// Convert readable stream to text
+		const bodyContents = await snapshot.Body.transformToString();
+		return JSON.parse(bodyContents) as VaultSnapshot;
+		// } catch (err) {
+		// 	console.log("@@@error", err);
+		// 	if (err.name === "NoSuchKey") {
+		// 		await this.writeSnapshot({ files: {}, deletedFiles: {} });
+		// 		return { files: {}, deletedFiles: {} };
+		// 	}
+		// 	throw new Error("Error Getting Storage Snapshot");
+		// }
 	}
 	async writeSnapshot(snapshot: VaultSnapshot) {
 		const put = new PutObjectCommand({

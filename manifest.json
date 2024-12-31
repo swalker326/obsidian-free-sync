@@ -1,11 +1,11 @@
 {
-	"id": "sample-plugin",
-	"name": "Sample Plugin",
+	"id": "obsidian-free-sync",
+	"name": "Free Sync",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "Demonstrates some of the capabilities of the Obsidian API.",
-	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md",
-	"fundingUrl": "https://obsidian.md/pricing",
+	"description": "Sync your notes with your own storage provider for free.",
+	"author": "shaneCodes",
+	"authorUrl": "https://swalker.dev",
+	"fundingUrl": "https://buymeacoffee.com/swalker326w",
 	"isDesktopOnly": false
 }

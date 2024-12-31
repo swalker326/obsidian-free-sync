@@ -9,6 +9,9 @@ export interface VaultSnapshot {
 	files: {
 		[path: string]: string;
 	};
+	deletedFiles: {
+		[path: string]: number;
+	};
 }
 
 export interface FreeSyncSettings {

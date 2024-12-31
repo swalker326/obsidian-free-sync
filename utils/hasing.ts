@@ -60,7 +60,7 @@ export class ObsidianHasher {
 		} catch (error) {
 			throw this.createError(
 				`${fileA.path}, ${fileB.path}`,
-				"Error comparing files",
+				"Error comparing files"
 			);
 		}
 	}
@@ -107,72 +107,3 @@ export class ObsidianHasher {
 		};
 	}
 }
-
-// Example usage in your plugin:
-/*
-export default class SyncPlugin extends Plugin {
-    private hasher: ObsidianHasher;
-
-    async onload() {
-        this.hasher = new ObsidianHasher(this.app.vault);
-
-        // Example: Hash a specific file
-        const file = this.app.vault.getAbstractFileByPath('path/to/note.md') as TFile;
-        if (file) {
-            const hash = await this.hasher.calculateHash(file);
-            console.log('File hash:', hash);
-        }
-
-        // Example: Batch hash multiple files
-        const markdownFiles = this.app.vault.getMarkdownFiles();
-        const hashes = await this.hasher.hashFiles(markdownFiles);
-        console.log('All hashes:', hashes);
-    }
-}
-*/
-
-// export async function handleFileChange(file: TFile, hasher: ObsidianHasher) {
-// 	const currentHash = await hasher.calculateHash(file);
-// 	const snapshot = await getSnapshot();
-
-// 	if (
-// 		!snapshot.files[file.path] ||
-// 		snapshot.files[file.path].hash !== currentHash
-// 	) {
-// 		// File is new or modified
-// 		if (snapshot.files[file.path]) {
-// 			// Existing file - handle versioning
-// 			await createNewVersion(file, snapshot.files[file.path]);
-// 		}
-
-// 		// Upload to R2
-// 		await uploadToR2(file);
-
-// 		// Update snapshot
-// 		snapshot.files[file.path] = {
-// 			path: file.path,
-// 			hash: currentHash,
-// 			lastModified: Date.now(),
-// 			version: (snapshot.files[file.path]?.version || 0) + 1,
-// 			size: file.size,
-// 		};
-
-// 		await saveSnapshot(snapshot);
-// 	}
-// }
-
-// export async function syncVault() {
-// 	const localSnapshot = await getLocalSnapshot();
-// 	const remoteSnapshot = await getRemoteSnapshot();
-
-// 	// Find files that differ
-// 	const diffFiles = findDifferentFiles(localSnapshot, remoteSnapshot);
-
-// 	for (const file of diffFiles) {
-// 		if (shouldDownload(file, localSnapshot, remoteSnapshot)) {
-// 			await downloadFromR2(file);
-// 		} else {
-// 			await uploadToR2(file);
-// 		}
-// 	}
-// }

@@ -1,7 +1,5 @@
 import {
 	App,
-	Editor,
-	MarkdownView,
 	Modal,
 	Notice,
 	Plugin,
@@ -33,44 +31,53 @@ export default class FreeSync extends Plugin {
 	async onload() {
 		await this.loadSettings();
 		this.hasher = new ObsidianHasher(this.app.vault);
-		this.storage = new FreeSyncStorage(this.app.vault, this.settings);
-		this.vaultUtility = new VaultUtility(
-			this.hasher,
-			this.storage,
+		this.vaultUtility = new VaultUtility(this.hasher);
+		this.storage = new FreeSyncStorage(
 			this.app.vault,
+			this.settings,
+			this.vaultUtility,
+			this.snapshot
 		);
 
 		// Initial sync when layout is ready
 		this.app.workspace.onLayoutReady(async () => {
-			try {
-				new Notice("Starting initial vault sync...");
+			new Notice("Starting initial vault sync...");
+			// Get remote snapshot first
+			console.log("this.vaultUtility", this.vaultUtility);
+			const remoteSnapshot = await this.vaultUtility.getRemoteSnapshot(
+				this.storage
+			);
+			// If remote has files but local is new, do initial download
+			if (Object.keys(remoteSnapshot.files).length > 0) {
+				new Notice("Found existing remote vault, downloading files...");
 
-				// Get remote snapshot first
-				const remoteSnapshot = await this.vaultUtility.getRemoteSnapshot();
+				// Create local snapshot
+				this.snapshot = await this.vaultUtility.makeSnapshot(
+					this.app.vault
+				);
 
-				// If remote has files but local is new, do initial download
-				if (Object.keys(remoteSnapshot.files).length > 0) {
-					new Notice("Found existing remote vault, downloading files...");
+				// Sync vault (this will download missing files)
+				await this.vaultUtility.syncVault({
+					localSnapshot: this.snapshot,
+					remoteSnapshot,
+					vault: this.app.vault,
+					storage: this.storage,
+				});
 
-					// Create local snapshot
-					const localSnapshot = await this.vaultUtility.makeSnapshot(
-						this.app.vault,
-					);
-
-					// Sync vault (this will download missing files)
-					await this.vaultUtility.syncVault({ localSnapshot, remoteSnapshot });
-
-					new Notice("Initial sync completed");
-				} else {
-					new Notice("No remote vault found, creating new snapshot...");
-					// Create initial snapshot from local files
-					await this.vaultUtility.createRemoteSnapshot(this.app.vault);
-					new Notice("Initial snapshot created");
-				}
-			} catch (error) {
-				new Notice(`Initial sync failed: ${error.message}`);
-				console.error("Initial sync error:", error);
+				new Notice("Initial sync completed");
+			} else {
+				new Notice("No remote vault found, creating new snapshot...");
+				// Create initial snapshot from local files
+				await this.vaultUtility.createRemoteSnapshot(
+					this.app.vault,
+					this.storage
+				);
+				new Notice("Initial snapshot created");
 			}
+			// } catch (error) {
+			// 	new Notice(`Initial sync failed: ${error.message}`);
+			// 	console.error("Initial sync error:", error);
+			// }
 		});
 
 		const ribbonIconEl = this.addRibbonIcon(
@@ -79,7 +86,7 @@ export default class FreeSync extends Plugin {
 			(evt: MouseEvent) => {
 				// Called when the user clicks the icon.
 				new Notice("This is a notice!");
-			},
+			}
 		);
 		// Perform additional things with the ribbon
 		ribbonIconEl.addClass("my-plugin-ribbon-class");
@@ -88,43 +95,37 @@ export default class FreeSync extends Plugin {
 		const statusBarItemEl = this.addStatusBarItem();
 		statusBarItemEl.setText("Status Bar Text");
 
-		// This adds a simple command that can be triggered anywhere
-		this.addCommand({
-			id: "open-sample-modal-simple",
-			name: "Open sample modal (simple)",
-			callback: () => {
-				new FreeSyncModal(this.app).open();
-			},
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: "sample-editor-command",
-			name: "Sample editor command",
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				console.log(editor.getSelection());
-				editor.replaceSelection("Sample Editor Command");
-			},
-		});
+		// // This adds an editor command that can perform some operation on the current editor instance
+		// this.addCommand({
+		// 	id: "sample-editor-command",
+		// 	name: "Sample editor command",
+		// 	editorCallback: (editor: Editor, view: MarkdownView) => {
+		// 		console.log(editor.getSelection());
+		// 		editor.replaceSelection("Sample Editor Command");
+		// 	},
+		// });
 		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: "open-sample-modal-complex",
-			name: "Open sample modal (complex)",
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView =
-					this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new FreeSyncModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
-			},
-		});
+		// this.addCommand({
+		// 	id: "sync-vault",
+		// 	name: "sync the local vault with the remote vault",
+		// 	callback: async () => {
+		// 		try {
+		// 			const localSnapshot = await this.vaultUtility.makeSnapshot(
+		// 				this.app.vault
+		// 			);
+		// 			const remoteSnapshot =
+		// 				await this.vaultUtility.getRemoteSnapshot();
+		// 			await this.vaultUtility.syncVault({
+		// 				localSnapshot,
+		// 				remoteSnapshot,
+		// 			});
+		// 			new Notice("Sync completed successfully");
+		// 		} catch (error) {
+		// 			new Notice(`Sync failed: ${error.message}`);
+		// 			console.error("Sync error:", error);
+		// 		}
+		// 	},
+		// });
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new FreeSyncSettingTab(this.app, this));
@@ -137,7 +138,7 @@ export default class FreeSync extends Plugin {
 
 		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
 		this.registerInterval(
-			window.setInterval(() => console.log("setInterval"), 5 * 60 * 1000),
+			window.setInterval(() => console.log("setInterval"), 5 * 60 * 1000)
 		);
 
 		// Add a sync command
@@ -147,10 +148,16 @@ export default class FreeSync extends Plugin {
 			callback: async () => {
 				try {
 					const localSnapshot = await this.vaultUtility.makeSnapshot(
-						this.app.vault,
+						this.app.vault
 					);
-					const remoteSnapshot = await this.vaultUtility.getRemoteSnapshot();
-					await this.vaultUtility.syncVault({ localSnapshot, remoteSnapshot });
+					const remoteSnapshot =
+						await this.vaultUtility.getRemoteSnapshot(this.storage);
+					await this.vaultUtility.syncVault({
+						localSnapshot,
+						remoteSnapshot,
+						vault: this.app.vault,
+						storage: this.storage,
+					});
 					new Notice("Sync completed successfully");
 				} catch (error) {
 					new Notice(`Sync failed: ${error.message}`);
@@ -162,23 +169,23 @@ export default class FreeSync extends Plugin {
 		// Register file event handlers
 		this.registerEvent(
 			this.app.vault.on("create", (file) =>
-				this.handleFileChange("create", file),
-			),
+				this.handleFileChange("create", file)
+			)
 		);
 		this.registerEvent(
 			this.app.vault.on("modify", (file) =>
-				this.handleFileChange("modify", file),
-			),
+				this.handleFileChange("modify", file)
+			)
 		);
 		this.registerEvent(
 			this.app.vault.on("delete", (file) =>
-				this.handleFileChange("delete", file),
-			),
+				this.handleFileChange("delete", file)
+			)
 		);
 		this.registerEvent(
 			this.app.vault.on("rename", (file, oldPath) =>
-				this.handleFileChange("rename", file, oldPath),
-			),
+				this.handleFileChange("rename", file, oldPath)
+			)
 		);
 	}
 
@@ -186,24 +193,33 @@ export default class FreeSync extends Plugin {
 		async (
 			type: "create" | "modify" | "delete" | "rename",
 			file: TAbstractFile,
-			oldPath?: string,
+			oldPath?: string
 		) => {
 			try {
 				if (file instanceof TFile) {
-					await this.vaultUtility.handleFileChange(type, file, oldPath);
+					await this.vaultUtility.handleFileChange(
+						type,
+						file,
+						{ vault: this.app.vault, storage: this.storage },
+						oldPath
+					);
 				}
 			} catch (error) {
 				console.error(`Error handling file ${type}: ${error.message}`);
 			}
 		},
 		1000,
-		true,
+		true
 	);
 
 	onunload() {}
 
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		this.settings = Object.assign(
+			{},
+			DEFAULT_SETTINGS,
+			await this.loadData()
+		);
 	}
 
 	async saveSettings() {
@@ -211,12 +227,13 @@ export default class FreeSync extends Plugin {
 	}
 
 	async reinitializeStorage() {
-		this.storage = new FreeSyncStorage(this.app.vault, this.settings);
-		this.vaultUtility = new VaultUtility(
-			this.hasher,
-			this.storage,
+		this.storage = new FreeSyncStorage(
 			this.app.vault,
+			this.settings,
+			this.vaultUtility,
+			this.snapshot
 		);
+		this.vaultUtility = new VaultUtility(this.hasher);
 	}
 }
 
@@ -259,7 +276,7 @@ class FreeSyncSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.endpoint = value;
 						await this.plugin.saveSettings();
-					}),
+					})
 			);
 
 		new Setting(containerEl)
@@ -272,7 +289,7 @@ class FreeSyncSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.accessKeyId = value;
 						await this.plugin.saveSettings();
-					}),
+					})
 			);
 
 		new Setting(containerEl)
@@ -285,7 +302,7 @@ class FreeSyncSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.secretAccessKey = value;
 						await this.plugin.saveSettings();
-					}),
+					})
 			)
 			.setClass("secret-input");
 
@@ -299,7 +316,7 @@ class FreeSyncSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.bucket = value;
 						await this.plugin.saveSettings();
-					}),
+					})
 			);
 	}
 }
